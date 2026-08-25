@@ -1,0 +1,13 @@
+name = "PlainCLIArgs"
+uuid = "1423b20a-918d-4e2b-9e58-f86bfc90768e"
+authors = ["León Alday-Toledo"]
+version = "0.1.0"
+
+[compat]
+julia = "1.10"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

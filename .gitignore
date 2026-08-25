@@ -1,0 +1,9 @@
+/Manifest*.toml
+bk-jl-files/
+*tar.gz
+*swp
+*sh
+*txt
+src/old*
+src/snippets-readme.jl
+src/tmp.jl
