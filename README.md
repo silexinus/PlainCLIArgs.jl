@@ -131,7 +131,7 @@ end
 
 The function `parseargs` returns a `ParsedArguments` value. It has four fields; all of them are string vectors:
 * `strings`, holds all the double-dash arguments (such as `--verbose` or `--mode1`)
-* `chars`, holds all the one-dash arguments. If you passed `-lthr` to the program, this field has the elements `"-l"`, `"-t"`, `"-h"`, `"-r"`.
+* `chars`, holds all the one-dash arguments. If you pass `-lthr` to the program, this field has the elements `"-l"`, `"-t"`, `"-h"`, `"-r"`.
 * `vals`, holds all the arguments that don't start with a dash, such as filenames or numeric values.
 * `args`, a copy of `ARGS`.
 
@@ -148,7 +148,7 @@ For the final example we'll go over an argument-parsing function for a program t
 
 We'll also add a mutual-exclusivity check because of the verbosity toggle, and the program displays a help message with `-h` or `--help`.
 
-Lastly, we'll include stray-flag detection using `findunclaimedtokens`. Therefore, this function will scan `ARGS` for every defined argument, and see at the end if any flag or value were left unclaimed. Having to do this bookkeeping step manually is a result of `PlainCLIArgs.jl`'s formulation: *Everything in plain sight. Nothing behind the scenes.*
+Lastly, we'll include stray-flag detection using `findunclaimedtokens`. Therefore, this function will scan `ARGS` for every defined argument, and check at the end if any flag or value were left unclaimed. Having to do this bookkeeping step manually is a result of `PlainCLIArgs.jl`'s formulation: *Everything in plain sight. Nothing behind the scenes.*
 
 As a result, the argument-parsing function is a bit long. However, every block is transparent, more flags can be added easily, and you are free to do a system call or `scp` or `curl` command or any other task at any point throughout the function.
 
@@ -244,7 +244,7 @@ function loadMyComplexProgramBehavior(args :: AbstractVector{<:AbstractString})
         error("The default bincount value is 50; you can override this but don't pass more than one bincount value! You passed the values $(join(getvalues.(binsdata),' '))")
     # Override the default if the user passed 1 bincount value
     elseif countvalues(binsdata) == 1
-        nbins = parse(Int, getvalue(binsdata))
+        nbins = getvalue(binsdata,Int)
     end
 
     # Final bookkeeping step
@@ -260,6 +260,6 @@ end
 
 The code we haven't seen yet is:
 * `FlagSearchResult` is a type with three fields: The first two are ints and are used for stray-flag detection: `whicharg` and `whichtoken`. The final one is a string: `value`, and is the one you'll be interacting with. The values from a `FlagSearchResult` scalar or vector can be extracted using the next two functions.
-* `getvalue` extracts the value from a scalar or 1-element `FlagSearchResult` vector. This is always a string, hence in the example above we convert it to an int before updating `nbins`: `nbins = parse(Int, getvalue(binsdata))`
-* `getvalues` is like `getvalue`, but it returns a vector of strings. Suppose your program took a variable amount of temperature values. The line that saves these values as a floatvec is: `temps = parse.(Float64, getvalues(tempdata))`
-* `countvalues` returns the amount of values passed for a flag. This is a handy way to ensure that the user passed a valid number of arguments for a given flag.
+* `getvalue` extracts the value from a `FlagSearchResult` or 1-element `Vector{FlagSearchResult}`. In the example above we want an integer value, hence we pass `Int` as the second argument of `getvalue`. If you run `getvalue(binsdata)`, you'll get the value as a `String`.
+* `getvalues` is like `getvalue`, but it takes any `Vector{FlagSearchResult}` and returns a vector (of `String`s if no type is provided, of the requested type otherwise). Suppose your program took a variable amount of temperature values. You can save them to a floatvec with: `temps = getvalues(tempdata,Float64)`
+* `countvalues` returns the amount of values passed for a flag. Use this to ensure that the user passed a valid number of arguments for a given flag.

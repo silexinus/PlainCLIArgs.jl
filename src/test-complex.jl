@@ -78,7 +78,7 @@ function loadMyComplexProgramBehavior(args :: AbstractVector{<:AbstractString})
     if countvalues(binsdata) > 1
         error("Pass only one bincount value! You passed the values $(join(getvalues.(binsdata),' '))\n")
     elseif countvalues(binsdata) == 1
-        nbins = parse(Int, getvalue(binsdata))
+        nbins = getvalue(binsdata,Int)
     end
 
     # Final bookkeeping step
