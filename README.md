@@ -5,7 +5,7 @@
 <!-- Because there's more than one way to skin a cat. And maybe you're skinning an octocat, so none of the cat-skinning methods work anyway. -->
 <!-- give the user complete freedom to work with the values directly and write the function that fully fits their situation. -->
 
-`PlainCLIArgs.jl` is an unopinionated package for handling of command-line arguments, oriented around `struct`s rather than `Dict`s. Its functions are transparent and composable and pure (no side-effects); they handle the tedious low-level minutia *and then get out of your way*. This lets you focus on something only you can do: a custom argument-reading function that fits the specifics of your problem *using the `julia` you know*, rather than having to learn and remember package-specific rules, work around implicit constraints, or rely on convenient-but-opaque workflows where part of the processing is done behind the scenes.
+`PlainCLIArgs.jl` is an unopinionated package for handling of command-line arguments. You can use it to create `struct`s, `Dict`s, or any other type. Its functions are transparent and composable and pure (no side-effects); they handle the tedious low-level minutia *and then get out of your way*. This lets you focus on something only you can do: a custom argument-reading function that fits the specifics of your problem *using the `julia` you know*, rather than having to learn and remember package-specific rules, work around implicit constraints, or rely on convenient-but-opaque workflows where some of the processing is done behind the scenes.
 
 If you're writing a simple program that only needs a few flags, `PlainCLIArgs.jl` can help you. On the other hand, for complex programs you'll have a constantly-growing list of options, several of them have a default value, others take a variable amount of arguments, others would ideally have multiple ways to call them (say, `-f` and `--file`), oh and there's so many flags a collision-detector is warranted (say, `-q` and `--quiet` are incompatible with `-v` and `--verbose`). And there's so many flags, what if the user makes a typo and the program behaves unexpectedly without warning so now you have to make a detector for stray flags and *and* ***and***. Well. `PlainCLIArgs.jl` will be there so you don't have to put your shoulder to the wheel; in the meantime you can figure out how to reach the next city before nightfall.
 
@@ -17,15 +17,15 @@ If you're writing a simple program that only needs a few flags, `PlainCLIArgs.jl
 3. Toggle-flags can be written in a character-cluster: `-q -t` is equivalent to `-qt`.
 4. Value-taker flags can't be written in clusters.
 
-That's it. If you're familiar with the way `bash` manages flags you're also familiar with axioms 1--3; the only surprise is point 4.
+That's it. If you're familiar with the way `bash` manages flags you're also familiar with axioms 1–3; the only surprise is point 4.
 
 # Examples of features
 
-This section shows a few examples of the package's functions in action. In a real-world use-case, you'd include these snippets in an argument-parsing function. There are some example functions further down.
+This section shows a few examples of the package's functions in action. In a real-world use-case, you'd include these snippets in an argument-parsing function. There are two example functions at the end of this page.
 
 ## Checking for mutual exclusivity
 
-Suppose your program has two main modes, toggled by `--mode1` and `--mode2`, and a "delete checkpoints" mode toggled by `-0`. Only one of these modes can be run at a time, so you use `checkmutualexclusivity` to ensure that the program stops if any two of these modes are requested:
+Suppose your program has two main modes, toggled by `--mode1` and `--mode2`, and a "delete checkpoints" mode toggled by `-0`. Only one of these modes can be run at a time, so you use `checkmutualexclusivity`: it will error out if any two of these modes are requested; otherwise it returns `nothing`:
 
 ```
 ex = "Flags -0 and --mode1 and --mode2 are mutually exclusive!"
@@ -36,10 +36,10 @@ where `ARGS` is what `julia` calls the string-vector of the command-line argumen
 
 ## Checking for group exclusivity
 
-What if you want to offer char-flags and string-flags that achieve the same thing? The flags `-v` and `--verbose` and `-q` and `--quiet` are a prime example: you can use `checkgroupexclusivity` to forbid the user to request options from different 'groups', such as `--verbose` and `-q`:
+What if you want to offer char-flags and string-flags that toggle the same behavior, the way real `bash` programs do? For example, the flags `-v` and `--verbose` and `-q` and `--quiet`. You can certainly define them, and then use `checkgroupexclusivity` to stop execution if the user requests options from different 'groups', such as `--verbose` and `-q`:
 
 ```
-# The next three lines are valid:
+# The next three calls are valid:
 # $:julia script.jl -q file.txt
 # $:julia script.jl file.txt -v
 # $:julia script.jl file.txt --quiet
@@ -53,7 +53,7 @@ checkgroupexclusivity(ARGS, ex, ["-q","--quiet"], ["-v","--verbose"])
 ```
 once again, `ex` is an explanation on why these modes are incompatible, and the next two, three, or however many vectors go after, are the groups with mutually-exclusive flags.
 
-## Fetching toggles from ARGS
+## Fetching toggles from `ARGS`
 
 Suppose your program has quiet and verbose modes. Here's some example calls where the user explicitly requests the quiet mode: the `-q` flag can optionally be part of a cluster:
 
@@ -66,7 +66,7 @@ The function that scans whether the `-q` flag was passed is simply:
 seekflag(ARGS,"-q")
 ```
 
-## Fetching values from ARGS
+## Fetching values from `ARGS`
 
 Suppose you want a program that:
 * analyzes an arbitrary amount of files, indicated by either `-f` or `--file`
@@ -263,4 +263,3 @@ The code we haven't seen yet is:
 * `getvalue` extracts the value from a scalar or 1-element `FlagSearchResult` vector. This is always a string, hence in the example above we convert it to an int before updating `nbins`: `nbins = parse(Int, getvalue(binsdata))`
 * `getvalues` is like `getvalue`, but it returns a vector of strings. Suppose your program took a variable amount of temperature values. The line that saves these values as a floatvec is: `temps = parse.(Float64, getvalues(tempdata))`
 * `countvalues` returns the amount of values passed for a flag. This is a handy way to ensure that the user passed a valid number of arguments for a given flag.
-
