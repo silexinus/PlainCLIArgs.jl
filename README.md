@@ -31,7 +31,7 @@ This section shows a few examples of the package's functions in action. In a rea
 
 Suppose your program has two main modes, toggled by `--mode1` and `--mode2`, and a "delete checkpoints" mode toggled by `-0`. Only one of these modes can be run at a time, so you use `checkmutualexclusivity`: it will error out if any two of these modes are requested; otherwise it returns `nothing`:
 
-```
+```julia
 # $:julia script.jl --mode1 file.txt --quiet --mode2
 ex = "Flags -0 and --mode1 and --mode2 are mutually exclusive!"
 checkmutualexclusivity(ARGS, ex, "-0", "--mode1", "--mode2")
@@ -42,7 +42,7 @@ where `ARGS` is what `julia` calls the string-vector containing the command-line
 
 What if you want to offer char-flags and string-flags that toggle the same behavior, the way real `bash` programs do? For example, the flags `-v` and `--verbose` and `-q` and `--quiet`. You can certainly define them, and then use `checkgroupexclusivity` to stop execution if the user requests options from different 'groups', such as `--verbose` and `-q`:
 
-```
+```julia
 # The next three calls are valid:
 # $:julia script.jl -q file.txt
 # $:julia script.jl file.txt -v
@@ -66,7 +66,7 @@ Suppose your program has quiet and verbose modes. Here's some example calls wher
 
 The function that scans whether the `-q` flag was passed is simply:
 
-```
+```julia
 seekflag(ARGS,"-q")
 ```
 
@@ -79,7 +79,8 @@ Suppose you want a program that:
 
 Then you can use this to fetch the values from a call like this:
 Using `PlainCLIArgs.jl`, your program will be able to fetch values and toggles from command-line, regardless of their order. Here's some example calls:
-```
+
+```julia
 $:julia script.jl -q -f file1.txt file2.txt -b 100
 $:julia script.jl -b 100 -f file1.txt file2.txt
 $:julia script.jl -quiet --file file1.txt file2.txt --nbins 100
@@ -87,7 +88,7 @@ $:julia script.jl -quiet --file file1.txt file2.txt --nbins 100
 
 Here's what the value-fetching code looks like:
 
-```
+```julia
 nbins = 50 # Default value, can be overriden by the user
 bincountdata = FlagSearchResult[]
 append!(bincountdata, seekvaluesof(ARGS,"-b"))
@@ -108,13 +109,13 @@ For this example we'll use a program that takes a filename and optionally a verb
 
 Here's what the call looks like:
 
-```
+```julia
 progbehavior = loadMySimpleProgramBehavior(ARGS)
 ```
 
 This program's `struct` is just:
 
-```
+```julia
 struct MySimpleProgramBehavior
     filename  :: String
     modequiet :: Bool
@@ -123,7 +124,7 @@ end
 
 And the argument-parsing function is:
 
-```
+```julia
 function loadMySimpleProgramBehavior(args :: AbstractVector{<:AbstractString})
     # Set default values
     modequiet = true
@@ -159,7 +160,8 @@ For the final example we'll go over an argument-parsing function for a program t
 We'll also add a mutual-exclusivity check because of the verbosity toggle, and the program displays a help message with `-h` or `--help`.
 
 For example, here are some valid ways to call the program:
-```
+
+```julia
 $:julia script.jl --help
 $:julia script.jl -q -f file1.txt file2.txt -b 100
 $:julia script.jl --quiet -b 100 -f file1.txt file2.txt
@@ -167,7 +169,8 @@ $:julia script.jl --file file1.txt file2.txt --verbose
 ```
 
 Whereas this one has a flag unknown to the program, so the argument-parsing function would throw an error and single out the `l` in the `-ql` flag.
-```
+
+```julia
 $:julia script.jl -ql -f file1.txt file2.txt -b 100
 ```
 
@@ -177,7 +180,7 @@ As a result, the argument-parsing function is a bit long. However, every block i
 
 Here's the `struct` for this program:
 
-```
+```julia
 struct MyComplexProgramBehavior
     filenames :: Vector{String}
     nbins :: Int
@@ -188,7 +191,7 @@ end
 
 Next is the argument parser. There's an explanation on the functions we haven't introduced so far, at the end:
 
-```
+```julia
 function loadMyComplexProgramBehavior(args :: AbstractVector{<:AbstractString})
     # Set default values
     nbins = 50
