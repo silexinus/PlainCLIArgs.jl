@@ -61,7 +61,7 @@ once again, `ex` is an explanation on why these modes are incompatible, and the 
 
 Suppose your program has quiet and verbose modes. Here's some example calls where the user explicitly requests the quiet mode: the `-q` flag can optionally be part of a cluster:
 
-```shell
+```bash
 $:julia script.jl -f file1.txt file2.txt -lqt --mode2
 $:julia script.jl -q -f file1.txt file2.txt -lt --mode2
 ```
@@ -82,7 +82,7 @@ Suppose you want a program that:
 Then you can use this to fetch the values from a call like this:
 Using `PlainCLIArgs.jl`, your program will be able to fetch values and toggles from command-line, regardless of their order. Here's some example calls:
 
-```shell
+```bash
 $:julia script.jl -q -f file1.txt file2.txt -b 100
 $:julia script.jl -b 100 -f file1.txt file2.txt
 $:julia script.jl -quiet --file file1.txt file2.txt --nbins 100
@@ -163,7 +163,7 @@ We'll also add a mutual-exclusivity check because of the verbosity toggle, and t
 
 For example, here are some valid ways to call the program:
 
-```shell
+```bash
 $:julia script.jl --help
 $:julia script.jl -q -f file1.txt file2.txt -b 100
 $:julia script.jl --quiet -b 100 -f file1.txt file2.txt
@@ -172,11 +172,11 @@ $:julia script.jl --file file1.txt file2.txt --verbose
 
 Whereas this one has a flag unknown to the program, so the argument-parsing function would throw an error and single out the `l` in the `-ql` flag.
 
-```shell
+```bash
 $:julia script.jl -ql -f file1.txt file2.txt -b 100
 ```
 
-Lastly, we'll include stray-flag detection using `findunclaimedtokens`. Therefore, the argument-parsing function will scan `ARGS` and extract the user's flags and values, then check at the end if any were left unclaimed. This bookkeeping step is done manually because of `PlainCLIArgs.jl`'s formulation: *Everything in plain sight. Nothing behind the scenes.*
+Lastly, we'll include stray-flag detection using `findunclaimedtokens`. Therefore, the argument-parsing function will scan `ARGS` and extract the user's flags and values, then check at the end if any were left unclaimed. This bookkeeping step is done manually because of `PlainCLIArgs.jl`'s motto: *Everything in plain sight. Nothing behind the scenes.*
 
 As a result, the argument-parsing function is a bit long. However, every block is transparent, more flags can be added easily, and you are free to do a system call or run `isfile` or `scp` or `curl` or any other task *at any point* throughout the function.
 
