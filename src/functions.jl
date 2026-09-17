@@ -1,4 +1,3 @@
-
 """
     ParsedArguments
 
@@ -13,7 +12,7 @@ The function [`parseargs`](@ref) takes `ARGS` and returns a `ParsedArguments` va
     as `--quiet`.
 - `chars::Vector{String}`: A list of the single-dash flags such
     as `-q`.
-- `vals::Vector{String}`: A list of all args that don't start
+- `values::Vector{String}`: A list of all args that don't start
     with a dash, such as `file1.txt`.
 - `args::Vector{String}`: A copy of the original string-vector that
     generated this `ParsedArguments` value.
@@ -36,28 +35,44 @@ parsedargs = parseargs(ARGS)
 if "-v" in parsedargs.chars || "--verbose" in parsedargs.strings
     modequiet = false
 end
-filename = only(parsedargs.vals)
+filename = only(parsedargs.values)
 ```
 """
 struct ParsedArguments
     strings :: Vector{String} # Such as "--file", "--verbose", ...
     chars   :: Vector{String} # Such as "-f", "-v", "-q", ... . Note that an input arg "-ab" will get split into "-a" and "-b"
-    vals    :: Vector{String} # The arguments that don't start with dashes
+    values  :: Vector{String} # The arguments that don't start with dashes
     args    :: Vector{String} # The full list of arguments
+end
+
+function Base.getproperty(pa :: ParsedArguments, fld :: Symbol)
+    if fld == :vals
+        return getfield(pa,:values)
+    else
+        return getfield(pa,fld)
+    end
 end
 
 function Base.:(==)(pa1 :: ParsedArguments, pa2 :: ParsedArguments)
     return pa1.strings == pa2.strings &&
            pa1.chars == pa2.chars &&
-           pa1.vals == pa2.vals &&
+           pa1.values == pa2.values &&
            pa1.args == pa2.args
+end
+
+function Base.isempty(pa :: ParsedArguments)
+    if isempty(pa.args)
+        return true
+    else
+        return false
+    end
 end
 
 """
     FlagSearchResult
 
 Return type of the toggle-detector [`seekflag`](@ref) and
-the value-fetching [`seekvalsof`](@ref). Crucial part of
+the value-fetching [`seekvaluesof`](@ref). Crucial part of
 the "detect any stray flags or args" machinery
 (see [`findunclaimedtokens`](@ref)).
 
@@ -80,12 +95,13 @@ or [`writetokens`](@ref).
 ```julia
 # \$:julia script.jl -f file1.txt --nbins 80
 nbins = 50 # Default value
-bincountdata = seekvalsof(ARGS,"--nbins"))
+bincountdata = seekvaluesof(ARGS,"--nbins")
 if countvalues(bincountdata) == 1
     nbins = getvalue(bincountdata,Int)
 elseif countvalues(bincountdata) > 1
     error("You can pass a maximum of one bincount value!")
 end
+# The line below evaluates to `true`
 # bincountdata == FlagSearchResult(4,1,"80")
 ```
 """
@@ -93,6 +109,14 @@ struct FlagSearchResult
     whicharg :: Int
     whichtoken :: Int
     value :: String
+end
+
+function Base.getproperty(sr :: FlagSearchResult, fld :: Symbol)
+    if fld == :val
+        return getfield(sr,:value)
+    else
+        return getfield(sr,fld)
+    end
 end
 
 function Base.:(==)(sr1 :: FlagSearchResult, sr2 :: FlagSearchResult)
@@ -129,6 +153,8 @@ value in `sr.value` to type `targettype` using `parse`.
 Users would normally use
 [`getvalue(vectorwithonesearchresult::AbstractVector{<:FlagSearchResult})`](@ref)
 rather than this function.
+
+`getval` is an alias of this function.
 """
 function getvalue(sr :: FlagSearchResult)
     return getvalues(sr,String)
@@ -150,11 +176,13 @@ This function returns a scalar, and errors out if the vector contains
 more than one value. For extracting values from a vector with many elements,
 see [`getvalues`](@ref).
 
+`getval` is an alias of this function.
+
 # Example
 ```julia
 # \$:julia script.jl -f file1.txt --nbins 80
 nbins = 50 # Default value
-bincountdata = seekvalsof(ARGS,"--nbins"))
+bincountdata = seekvaluesof(ARGS,"--nbins")
 # bincountdata is a `Vector{FlagSearchResult}` of length 2, but only 
 #   the second element has a meaningful value (since the first `FlagSearchResult`
 #   refers to the flag "--nbins", and only 1 value was passed
@@ -195,6 +223,8 @@ Users would normally use
 or
 [`getvalues(srs::AbstractVector{<:FlagSearchResult},targettype::DataType)`](@ref)
 rather than this function.
+
+`getvals` is an alias of this function.
 """
 function getvalues(sr :: FlagSearchResult)
     if startswith(sr.value,'-')
@@ -224,11 +254,13 @@ If `targettype` is not provided, return a `Vector{String}`.
 Otherwise, attempt to convert the `String` values to type `targettype`
 using `parse`.
 
+`getvals` is an alias of this function.
+
 # Examples
 ```julia
 # \$:julia script.jl -f file1.txt file2.txt --nbins 80
-filenamedata = seekvalsof(ARGS,"-f"))
-# filenamedata is a `Vector{FlagSearchResult}` with 3 elements (one for
+filenamesdata = seekvaluesof(ARGS,"-f")
+# filenamesdata is a `Vector{FlagSearchResult}` with 3 elements (one for
 #   the "-f", two for the values that go after)
 filenames = getvalues(filenamesdata)
 println(filenames == ["file1.txt", "file2.txt"]) # Prints `true`
@@ -236,7 +268,7 @@ println(filenames == ["file1.txt", "file2.txt"]) # Prints `true`
 
 ```julia
 # \$:julia script.jl -f file1.txt file2.txt --temperature 200 500
-temperaturedata = seekvalsof(ARGS,"--temperature"))
+temperaturedata = seekvaluesof(ARGS,"--temperature")
 temperatures = getvalues(temperaturedata,Float64)
 println(temperatures == [200.0,500.0]) # Prints `true`
 ```
@@ -251,6 +283,21 @@ function getvalues(srs :: AbstractVector{<:FlagSearchResult}, targettype :: Data
     return maybeparse.(targettype, getfield.(srs_noflag,:value) )
 end
 
+
+"""
+    getval(arguments...)
+
+Alias for [`getvalue`](@ref).
+"""
+getval(arguments...) = getvalue(arguments...)
+
+"""
+    getvals(arguments...)
+
+Alias for [`getvalues`](@ref).
+"""
+getvals(arguments...) = getvalues(arguments...)
+
 """
     countvalues(srs::AbstractVector{<:FlagSearchResult})::Int
 
@@ -258,16 +305,18 @@ Counts the amount of elements in a `Vector{FlagSearchResult}` that hold
 a value (so, the flags are discarded). Use this instead of `length`, since
 that'll include elements derived from, say, "--file", "-f", and such.
 
+`countvals` is an alias of this function.
+
 ```julia
 # \$:julia script.jl -f file1.txt file2.txt --nbins 80 --file file3.txt
-filenamedata = FlagSearchResult[]
-append!(filenamedata, seekvalsof(ARGS,"-f"))
-append!(filenamedata, seekvalsof(ARGS,"--file"))
-println(countvalues(filenamedata)) # prints 3, since 3 files were listed
-println(length(filenamedata)) # prints 5, since the vector has 5 elements
-                              #   (3 values+2 flags; we care about
-                              #   the amount of values rather than the 
-                              #   values+flags count)
+filenamesdata = FlagSearchResult[]
+append!(filenamesdata, seekvaluesof(ARGS,"-f"))
+append!(filenamesdata, seekvaluesof(ARGS,"--file"))
+println(countvalues(filenamesdata)) # prints 3, since 3 files were listed
+println(length(filenamesdata)) # prints 5, since the vector has 5 elements
+                               #   (3 values+2 flags; we care about
+                               #   the amount of values rather than the 
+                               #   values+flags count)
 ```
 """
 function countvalues(srs :: AbstractVector{<:FlagSearchResult})
@@ -276,11 +325,18 @@ function countvalues(srs :: AbstractVector{<:FlagSearchResult})
 end
 
 """
+    countvals(arguments...)
+
+Alias for [`countvalues`](@ref).
+"""
+countvals(arguments...) = countvalues(arguments...)
+
+"""
     gettoken(parsedargs::ParsedArguments,thisarg::Integer,thistoken::Integer)::String
     gettoken(args::AbstractVector{<:AbstractString},thisarg::Integer,thistoken::Integer)::String
 
-Internal-use function. Fetch a specific 'token' from an argument. Stringflags and
-values only have one token (themselves) while charflag clusters have several
+Internal-use function. Fetch a specific 'token' from an argument. Values and
+stringflags only have one token (themselves) while charflag clusters have several
 tokens.
 
 # Examples
@@ -393,6 +449,8 @@ Return `true` for elements of `ARGS` that are values (these don't start
 with a dash), rather than charflags (start with 1 dash) or stringflags
 (start with 2 dashes).
 
+`isval` is an alias of this function.
+
 # Examples
 ```jldoctest
 julia> isvalue("file1.txt")
@@ -414,7 +472,14 @@ function isvalue(instring :: AbstractString)
 end
 
 """
-    parseargs(args::AbstractVector{<:AbstractString})
+    isval(arguments...)
+
+Alias for [`isvalue`](@ref).
+"""
+isval(arguments...) = isvalue(arguments...)
+
+"""
+    parseargs(args::AbstractVector{<:AbstractString})::ParsedArguments
 
 Takes a `Vector{String}` and returns a [`ParsedArguments`](@ref).
 This `struct` is mostly used for checking for the presence of
@@ -428,7 +493,7 @@ function parseargs(args :: AbstractVector{<:AbstractString})
 
     strings = String[]
     chars = String[]
-    vals = String[]
+    values = String[]
 
     # If an argument starts with "--", drop the "--" and copy the remaining string to `strings'
     for i in 1:nargs
@@ -449,17 +514,17 @@ function parseargs(args :: AbstractVector{<:AbstractString})
         end
     end
 
-    # All args that start neither with "--" or "-" are appended to vals
+    # All args that start neither with "--" or "-" are appended to values
     for i in 1:nargs
         if !logargs[i]
-            push!(vals, args[i])
+            push!(values, args[i])
         end
     end
 
     return ParsedArguments(
                strings,
                chars,
-               vals,
+               values,
                args
            )
 end
@@ -591,7 +656,7 @@ end
 
 Detect if a given flag exists in `ARGS`. Mostly used for detecting toggles.
 
-See also [`seekvalsof`](@ref).
+See also [`seekvaluesof`](@ref), [`seekallvalues`](@ref).
 
 # Example
 ```julia
@@ -642,20 +707,22 @@ function seekflag(args :: AbstractVector{<:AbstractString}, flag :: AbstractStri
 end
 
 """
-    seekvalsof(parsedargs::ParsedArguments,flag::AbstractString)::Vector{FlagSearchResult}
-    seekvalsof(args::AbstractVector{<:AbstractString},flag::AbstractString)::Vector{FlagSearchResult}
+    seekvaluesof(parsedargs::ParsedArguments,flag::AbstractString)::Vector{FlagSearchResult}
+    seekvaluesof(args::AbstractVector{<:AbstractString},flag::AbstractString)::Vector{FlagSearchResult}
 
 If `flag` doesn't exist in `ARGS`, return an empty `Vector{FlagSearchResult}`.
 Otherwise, return a `Vector{FlagSearchResult}` with the flag and any subsequent
 values. They can be extracted and converted using [`getvalues`](@ref).
 
-See also [`seekflag`](@ref).
+`seekvalsof` is an alias of this function.
+
+See also [`seekflag`](@ref), [`seekallvalues`](@ref).
 
 # Example
 ```julia
 filenamesdata = FlagSearchResult[]
-append!(filenamesdata, seekvalsof(ARGS,"-f"))
-append!(filenamesdata, seekvalsof(ARGS,"--file"))
+append!(filenamesdata, seekvaluesof(ARGS,"-f"))
+append!(filenamesdata, seekvaluesof(ARGS,"--file"))
 
 if countvalues(filenamesdata) == 0
     error("Pass a nonzero amount of filenames to analyze.")
@@ -665,12 +732,12 @@ else
 end
 ```
 """
-function seekvalsof(parsedargs :: ParsedArguments, flag :: AbstractString)
-    return seekvalsof(parsedargs.args, flag)
+function seekvaluesof(parsedargs :: ParsedArguments, flag :: AbstractString)
+    return seekvaluesof(parsedargs.args, flag)
 end
 
-function seekvalsof(args :: AbstractVector{<:AbstractString}, flag :: AbstractString)
-    # This function is only meant to be called for flags that take vals
+function seekvaluesof(args :: AbstractVector{<:AbstractString}, flag :: AbstractString)
+    # This function is only meant to be called for flags that take values
     # Therefore, if the user passes a charflag, this block checks that this
     #   charflag isn't in a cluster
     if length(flag) == 2 && startswith(flag,'-')
@@ -711,6 +778,108 @@ function seekvalsof(args :: AbstractVector{<:AbstractString}, flag :: AbstractSt
 end
 
 """
+    seekvalsof(arguments...)
+
+Alias for [`seekvaluesof`](@ref).
+"""
+seekvalsof(arguments...) = seekvaluesof(arguments...)
+
+"""
+    seekallvalues(parsedargs::ParsedArguments)::Vector{FlagSearchResult}
+    seekallvalues(args::AbstractVector{<:AbstractString})::Vector{FlagSearchResult}
+
+Return all values in `ARGS`. Some uses of this function include: counting
+the total amount of values, gathering all values passed to a program that
+only takes one type of value (hence, it doesn't need a flag marking the
+values).
+
+`seekallvals` is an alias of this function.
+
+See also [`seekflag`](@ref), [`seekvaluesof`](@ref).
+
+# Example
+```
+# Example calls:
+# \$:julia script.sh -h
+# \$:julia script.sh --help
+# \$:julia script.sh file1.txt
+# \$:julia script.sh file1.txt file2.txt
+
+using PlainCLIArgs
+
+struct MyProgramBehavior
+    filenames :: Vector{String}
+    modehelp :: Bool
+end
+
+function loadMyProgramBehavior(args :: AbstractVector{<:AbstractString})
+    # Set default values
+    modehelp = false
+
+    # This helps us detect stray flags or typos
+    claimedtokens = FlagSearchResult[]
+
+    # Resolve modehelp value
+    helpdata = FlagSearchResult[]
+    append!(helpdata, seekflag(args,"-h"))
+    append!(helpdata, seekflag(args,"--help"))
+
+    if !isempty(helpdata)
+        modehelp = true
+    end
+
+    # Bookkeeping for stray-token detection
+    append!(claimedtokens, helpdata)
+
+    # Parse the requested filenames
+    # This program doesn't take a flag like -f or --file to indicate
+    #   which values are filenames. Because every value is a filename.
+    filenamesdata = seekallvalues(args)
+
+    if countvalues(filenamesdata) == 0 && !modehelp
+        error("Pass a nonzero amount of filenames to analyze.")
+    else
+        filenames = getvalues(filenamesdata)
+        # Here you can check that all the requested filenames exist
+    end
+
+    # Bookkeeping for stray-token detection
+    append!(claimedtokens, filenamesdata)
+
+    # Final bookkeeping step
+    unclaimed = findunclaimedtokens(args,claimedtokens)
+    if !isempty(unclaimed)
+        error("Error in ARGS! You passed some stray options. Run \\n  \$:julia myprogram.jl -h\\nto see the valid options.\\n\\n== Stray tokens:\\n"*join(writetokens(args,unclaimed),'\n'))
+    end
+
+    return MyProgramBehavior(filenames,modehelp)
+end
+```
+"""
+function seekallvalues(args :: AbstractVector{<:AbstractString})
+    nargs = length(args)
+    searchresults = FlagSearchResult[]
+    for i in 1:nargs
+        if isvalue(args[i])
+            push!(searchresults, FlagSearchResult(i,1,args[i]))
+        end
+    end
+
+    return searchresults
+end
+
+function seekallvalues(parsedargs :: ParsedArguments)
+    return seekallvalues(parsedargs.args)
+end
+
+"""
+    seekallvals(arguments...)
+
+Alias for [`seekallvalues`](@ref).
+"""
+seekallvals(arguments...) = seekallvalues(arguments...)
+
+"""
     findunclaimedtokens(parsedargs::ParsedArguments,searchresults::AbstractVector{<:FlagSearchResult})::Vector{FlagSearchResult}
     findunclaimedtokens(args::AbstractVector{<:AbstractString},searchresults::AbstractVector{<:FlagSearchResult})::Vector{FlagSearchResult}
 
@@ -719,11 +888,20 @@ and return a `Vector{FlagSearchResult}` with any stringflag or charflag
 or value in `ARGS` not listed in `searchresults`.
 
 Using this function requires saving the output of all [`seekflag`](@ref) and
-[`seekvalsof`](@ref) calls, and lets you detect any stray/typo flag in the
+[`seekvaluesof`](@ref) calls, and lets you detect any stray/typo flag in the
 user's input.
 
 # Example
 ```
+# Example calls:
+# \$:julia script.sh -h
+# \$:julia script.sh --help
+# \$:julia script.sh -f file1.txt
+# \$:julia script.sh -f file1.txt file2.txt
+# \$:julia script.sh --file file1.txt file2.txt
+
+using PlainCLIArgs
+
 struct MyProgramBehavior
     filenames :: Vector{String}
     modehelp :: Bool
@@ -750,8 +928,8 @@ function loadMyProgramBehavior(args :: AbstractVector{<:AbstractString})
 
     # Parse the requested filenames
     filenamesdata = FlagSearchResult[]
-    append!(filenamesdata, seekvalsof(args,"-f"))
-    append!(filenamesdata, seekvalsof(args,"--file"))
+    append!(filenamesdata, seekvaluesof(args,"-f"))
+    append!(filenamesdata, seekvaluesof(args,"--file"))
 
     if countvalues(filenamesdata) == 0 && !modehelp
         error("Pass a nonzero amount of filenames to analyze.")
@@ -766,7 +944,7 @@ function loadMyProgramBehavior(args :: AbstractVector{<:AbstractString})
     # Final bookkeeping step
     unclaimed = findunclaimedtokens(args,claimedtokens)
     if !isempty(unclaimed)
-        error("Error in ARGS! You passed some stray options. Run \\n  \$:julia myprogram.jl -h\\nto see the valid options.\\n\\n== Stray tokens:\\n"*join(writetokens(args,unclaimed),'\\n'))
+        error("Error in ARGS! You passed some stray options. Run \\n  \$:julia myprogram.jl -h\\nto see the valid options.\\n\\n== Stray tokens:\\n"*join(writetokens(args,unclaimed),'\n'))
     end
 
     return MyProgramBehavior(filenames,modehelp)

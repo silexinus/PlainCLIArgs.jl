@@ -1,10 +1,15 @@
 module PlainCLIArgs
 
 export ParsedArguments, FlagSearchResult,
-       parseargs, seekflag, seekvalsof,
+       parseargs, seekflag, seekvaluesof, seekallvalues,
        checkmutualexclusivity, checkgroupexclusivity,
        findunclaimedtokens, writetokens,
-       getvalue, getvalues, countvalues
+       isvalue, getvalue, getvalues,
+       countvalues,
+       # Now the aliases
+       seekvalsof, seekallvals,
+       isval, getval, getvals,
+       countvals
 
 include("functions.jl")
 

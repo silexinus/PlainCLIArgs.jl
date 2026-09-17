@@ -53,3 +53,34 @@ end
     unclaimed = PlainCLIArgs.findunclaimedtokens(args, claimed)
     @test !isempty(unclaimed)             # "-w" should show up as unclaimed
 end
+
+@testset "seekallvalues - basic extraction" begin
+    args = ["-f", "file1.txt", "-q", "file2.txt"]
+    result = PlainCLIArgs.seekallvalues(args)
+    @test length(result) == 2
+    @test PlainCLIArgs.getvalues(result) == ["file1.txt", "file2.txt"]
+end
+
+@testset "seekallvalues - no values present" begin
+    args = ["-q", "--verbose", "-lthr"]
+    result = PlainCLIArgs.seekallvalues(args)
+    @test isempty(result)
+end
+
+@testset "seekallvalues - all values, no flags" begin
+    args = ["file1.txt", "file2.txt", "file3.txt"]
+    result = PlainCLIArgs.seekallvalues(args)
+    @test PlainCLIArgs.countvalues(result) == 3
+    @test PlainCLIArgs.getvalues(result) == args
+end
+
+@testset "seekallvalues - ParsedArguments dispatch matches AbstractVector dispatch" begin
+    args = ["-f", "file1.txt", "-q", "file2.txt"]
+    pa = PlainCLIArgs.parseargs(args)
+    @test PlainCLIArgs.seekallvalues(pa) == PlainCLIArgs.seekallvalues(args)
+end
+
+@testset "seekallvals is an alias of seekallvalues" begin
+    args = ["-f", "file1.txt", "-q", "file2.txt"]
+    @test PlainCLIArgs.seekallvals(args) == PlainCLIArgs.seekallvalues(args)
+end

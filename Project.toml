@@ -1,7 +1,7 @@
 name = "PlainCLIArgs"
 uuid = "1423b20a-918d-4e2b-9e58-f86bfc90768e"
 authors = ["León Alday-Toledo"]
-version = "0.1.0"
+version = "0.1.1"
 
 [compat]
 julia = "1.10"
