@@ -5,9 +5,9 @@
 <!-- Because there's more than one way to skin a cat. And maybe you're skinning an octocat, so none of the cat-skinning methods work anyway. -->
 <!-- give the user complete freedom to work with the values directly and write the function that fully fits their situation. -->
 
-<center>
-<h2><Everything in plain sight. Nothing behind the scenes.></h2>
-</center>
+<p align="center">
+<strong>Everything in plain sight. Nothing behind the scenes.</strong>
+</p>
 
 `PlainCLIArgs.jl` is an unopinionated package for handling command-line arguments. You can use it to create `struct`s, `Dict`s, or any other type. Its functions are transparent and composable and pure (no side-effects); they handle the tedious low-level processing *and then get out of your way*. This leaves you unimpeded to write a custom argument-reading function that fits the specifics of your problem *using the `julia` you know*, rather than having to learn and remember package-specific rules, work around implicit constraints, or rely on convenient-but-opaque workflows where some of the processing is done behind the scenes.
 
