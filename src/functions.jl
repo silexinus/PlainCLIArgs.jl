@@ -145,10 +145,23 @@ end
 """
     getvalue(sr::FlagSearchResult)::String
     getvalue(sr::FlagSearchResult,targettype::DataType)::targettype
+    getvalue(sr::FlagSearchResult,replacedata::Pair)::String
+    getvalue(sr::FlagSearchResult,vecreplacedata::AbstractVector{<:Pair})::String
+    getvalue(sr::FlagSearchResult,targettype::DataType,replacedata::Pair)::targettype
+    getvalue(sr::FlagSearchResult,targettype::DataType,vecreplacedata::AbstractVector{<:Pair})::targettype
 
 Return the field `value` contained in a `FlagSearchResult`. If `targettype`
 is not provided, return a `String`. Otherwise, attempt to convert the `String`
 value in `sr.value` to type `targettype` using `parse`.
+
+This function returns a scalar, and errors out if the vector contains
+more than one value. For extracting values from a vector with many elements,
+see [`getvalues`](@ref).
+
+If a `Pair` element or vector is passed, the function `replace` is called to
+substitute substrings within the extracted values, such as `"min3"` representing
+the `Int` value `-3` (this lets you pass negative values via `ARGS` without having
+them being treated as flags).
 
 Users would normally use
 [`getvalue(vectorwithonesearchresult::AbstractVector{<:FlagSearchResult})`](@ref)
@@ -164,13 +177,59 @@ function getvalue(sr :: FlagSearchResult, targettype :: DataType)
     return getvalues(sr,targettype)
 end
 
+function getvalue(sr :: FlagSearchResult, replacedata :: Pair)
+    return getvalues(sr,String,replacedata)
+end
+
+function getvalue(sr :: FlagSearchResult, vecreplacedata :: AbstractVector{<:Pair})
+    return getvalues(sr,String,vecreplacedata)
+end
+
+function getvalue(sr :: FlagSearchResult, targettype :: DataType, replacedata :: Pair)
+    return getvalues(sr,targettype,replacedata)
+end
+
+function getvalue(sr :: FlagSearchResult, targettype :: DataType, vecreplacedata :: AbstractVector{<:Pair})
+    return getvalues(sr,targettype,vecreplacedata)
+end
+
+function applyreplacedataonvalue(fsr :: FlagSearchResult, replacedata :: Pair)
+    return FlagSearchResult(fsr.whicharg, fsr.whichtoken, replace(fsr.value,replacedata) )
+end
+
+function applyreplacedataonvalue(fsr :: FlagSearchResult, vecreplacedata :: AbstractVector{<:Pair})
+    return FlagSearchResult(fsr.whicharg, fsr.whichtoken, replace(fsr.value,vecreplacedata...) )
+end
+
+# Aux fun: drop flags, require exactly one value, and return that single
+#   `FlagSearchResult`. Flags are excluded before any substring replacement
+#   is done. Otherwise args like "min5" would become "-5", then treated as
+#   a flag, and dropped 🫠
+function _onlyvalueresult(srs :: AbstractVector{<:FlagSearchResult})
+    srs_noflag = filter( sr -> !startswith(getfield(sr,:value), '-'), srs)
+    if length(srs_noflag) != 1
+        nep = min(length(srs_noflag),5) # n(elements to print)
+        error("You passed a vector with $(length(srs_noflag)) values to getvalue. This function only accepts vectors of length 1.\nHere's the first $nep elements:\n$(join(first(srs_noflag,nep),'\n'))")
+    end
+    return only(srs_noflag)
+end
+
 """
     getvalue(vecsr::AbstractVector{<:FlagSearchResult})::String
     getvalue(vecsr::AbstractVector{<:FlagSearchResult},targettype::DataType)::targettype
+    getvalue(vecsr::AbstractVector{<:FlagSearchResult},replacedata::Pair)::String
+    getvalue(vecsr::AbstractVector{<:FlagSearchResult},targettype::DataType,replacedata::Pair)::targettype
+    getvalue(vecsr::AbstractVector{<:FlagSearchResult},vecreplacedata::AbstractVector{<:Pair})::String
+    getvalue(vecsr::AbstractVector{<:FlagSearchResult},targettype::DataType,vecreplacedata::AbstractVector{<:Pair})::targettype
 
 Return the field `value` contained in a `Vector{FlagSearchResult}`. If
 `targettype` is not provided, return a `String`. Otherwise, attempt to
 convert the `String` value to type `targettype` using `parse`.
+
+If a `Pair` element or vector is passed, the function `replace` is called to
+substitute substrings within the extracted values, such as `"min3"` representing
+the `Int` value `-3` (this lets you pass negative values via `ARGS` without having
+them being treated as flags).
 
 This function returns a scalar, and errors out if the vector contains
 more than one value. For extracting values from a vector with many elements,
@@ -196,21 +255,39 @@ println(nbins) # Prints 80; nbins is an `Int`
 ```
 """
 function getvalue(vectorwithonesearchresult :: AbstractVector{<:FlagSearchResult})
-    return getvalue(vectorwithonesearchresult,String)
+    return getvalue(vectorwithonesearchresult, String)
 end
+
 function getvalue(vectorwithonesearchresult :: AbstractVector{<:FlagSearchResult}, targettype :: DataType)
-    vw1sr_noflag = filter( sr -> !startswith(getfield(sr,:value), '-'), vectorwithonesearchresult)
-    if length(vw1sr_noflag) != 1
-        nep = min(length(vw1sr_noflag),5) # n(elements to print)
-        error("You passed a vector with $(length(vw1sr_noflag)) values to getvalue. This function only accepts vectors of length 1.\nHere's the first $nep elements:\n$(join(vw1sr_noflag,'\n'))")
-    else
-        return only(getvalues(vw1sr_noflag,targettype))
-    end
+    sr = _onlyvalueresult(vectorwithonesearchresult)
+    return maybeparse(targettype, sr.value)
+end
+
+function getvalue(vectorwithonesearchresult :: AbstractVector{<:FlagSearchResult}, replacedata :: Pair)
+    return getvalue(vectorwithonesearchresult, String, replacedata)
+end
+
+function getvalue(vectorwithonesearchresult :: AbstractVector{<:FlagSearchResult}, targettype :: DataType, replacedata :: Pair)
+    sr = _onlyvalueresult(vectorwithonesearchresult)
+    return maybeparse(targettype, applyreplacedataonvalue(sr, replacedata).value)
+end
+
+function getvalue(vectorwithonesearchresult :: AbstractVector{<:FlagSearchResult}, vecreplacedata :: AbstractVector{<:Pair})
+    return getvalue(vectorwithonesearchresult, String, vecreplacedata)
+end
+
+function getvalue(vectorwithonesearchresult :: AbstractVector{<:FlagSearchResult}, targettype :: DataType, vecreplacedata :: AbstractVector{<:Pair})
+    sr = _onlyvalueresult(vectorwithonesearchresult)
+    return maybeparse(targettype, applyreplacedataonvalue(sr, vecreplacedata).value)
 end
 
 """
     getvalues(sr::FlagSearchResult)::String
     getvalues(sr::FlagSearchResult,targettype::DataType)::targettype
+    getvalues(sr::FlagSearchResult,replacedata::Pair)::String
+    getvalues(sr::FlagSearchResult,vecreplacedata::AbstractVector{<:Pair})::String
+    getvalues(sr::FlagSearchResult,targettype::DataType,replacedata::Pair)::targettype
+    getvalues(sr::FlagSearchResult,targettype::DataType,vecreplacedata::AbstractVector{<:Pair})::targettype
 
 Return the field `value` contained in the `FlagSearchResult` of a value argument
 from `ARGS`; if this `FlagSearchResult` corresponds to a flag, return an empty
@@ -218,11 +295,13 @@ string. If `targettype` is not provided, return a `String`.
 Otherwise, attempt to convert the `String` value to type `targettype`
 using `parse`.
 
-Users would normally use
-[`getvalues(srs::AbstractVector{<:FlagSearchResult})`](@ref)
-or
-[`getvalues(srs::AbstractVector{<:FlagSearchResult},targettype::DataType)`](@ref)
-rather than this function.
+If a `Pair` element or vector is passed, the function `replace` is called to
+substitute substrings within the extracted values, such as `"min3"` representing
+the `Int` value `-3` (this lets you pass negative values via `ARGS` without having
+them being treated as flags).
+
+Users would normally use the versions of `getvalues` that take a `Vector{FlagSearchResult}`
+rather than these (the scalar-taking versions).
 
 `getvals` is an alias of this function.
 """
@@ -245,14 +324,55 @@ function getvalues(sr :: FlagSearchResult, targettype :: DataType)
     end
 end
 
+function getvalues(sr :: FlagSearchResult, replacedata :: Pair)
+    if startswith(sr.value,'-')
+        return ""
+    else
+        return replace(sr.value,replacedata)
+    end
+end
+
+function getvalues(sr :: FlagSearchResult, vecreplacedata :: AbstractVector{<:Pair})
+    if startswith(sr.value,'-')
+        return ""
+    else
+        return replace(sr.value,vecreplacedata...)
+    end
+end
+
+function getvalues(sr :: FlagSearchResult, targettype :: DataType, replacedata :: Pair)
+    if startswith(sr.value,'-')
+        return ""
+    else
+        return maybeparse(targettype, replace(sr.value,replacedata) )
+    end
+end
+
+function getvalues(sr :: FlagSearchResult, targettype :: DataType, vecreplacedata :: AbstractVector{<:Pair})
+    if startswith(sr.value,'-')
+        return ""
+    else
+        return maybeparse(targettype, replace(sr.value,vecreplacedata...) )
+    end
+end
+
 """
     getvalues(srs::AbstractVector{<:FlagSearchResult})::Vector{String}
     getvalues(srs::AbstractVector{<:FlagSearchResult},targettype::DataType)::Vector{targettype}
+    getvalues(srs::AbstractVector{<:FlagSearchResult},replacedata::Pair)::Vector{String}
+    getvalues(srs::AbstractVector{<:FlagSearchResult},vecreplacedata::AbstractVector{<:Pair})::Vector{String}
+    getvalues(srs::AbstractVector{<:FlagSearchResult},targettype::DataType,replacedata::Pair)::Vector{targettype}
+    getvalues(srs::AbstractVector{<:FlagSearchResult},targettype::DataType,vecreplacedata::AbstractVector{<:Pair})::Vector{targettype}
 
 Return a vector with the fields `value` from a vector of `FlagSearchResult`s.
 If `targettype` is not provided, return a `Vector{String}`.
 Otherwise, attempt to convert the `String` values to type `targettype`
 using `parse`.
+
+If a `Pair` element or vector is passed, the function `replace` is called to
+substitute substrings within the extracted values, such as `"min3"` representing
+the `Int` value `-3` (this lets you pass negative values via `ARGS` without having
+them being treated as flags).
 
 `getvals` is an alias of this function.
 
@@ -283,6 +403,30 @@ function getvalues(srs :: AbstractVector{<:FlagSearchResult}, targettype :: Data
     return maybeparse.(targettype, getfield.(srs_noflag,:value) )
 end
 
+# Aux fun: discard flags while keeping the values, and THEN apply the
+#   replacedata, and finally parse.
+# `replacedata` can be a `Pair` or a vector of `Pair`.
+function _getvalues_replaced(srs :: AbstractVector{<:FlagSearchResult}, targettype :: DataType, replacedata)
+    srs_noflag = filter( sr -> !startswith(getfield(sr,:value), '-'), srs)
+    replaced   = applyreplacedataonvalue.(srs_noflag, Ref(replacedata))
+    return maybeparse.(targettype, getfield.(replaced,:value) )
+end
+
+function getvalues(srs :: AbstractVector{<:FlagSearchResult}, replacedata :: Pair)
+    return _getvalues_replaced(srs, String, replacedata)
+end
+
+function getvalues(srs :: AbstractVector{<:FlagSearchResult}, targettype :: DataType, replacedata :: Pair)
+    return _getvalues_replaced(srs, targettype, replacedata)
+end
+
+function getvalues(srs :: AbstractVector{<:FlagSearchResult}, vecreplacedata :: AbstractVector{<:Pair})
+    return _getvalues_replaced(srs, String, vecreplacedata)
+end
+
+function getvalues(srs :: AbstractVector{<:FlagSearchResult}, targettype :: DataType, vecreplacedata :: AbstractVector{<:Pair})
+    return _getvalues_replaced(srs, targettype, vecreplacedata)
+end
 
 """
     getval(arguments...)
@@ -656,7 +800,7 @@ end
 
 Detect if a given flag exists in `ARGS`. Mostly used for detecting toggles.
 
-See also [`seekvaluesof`](@ref), [`seekallvalues`](@ref).
+See also [`seekNvaluesof`](@ref), [`seekvaluesof`](@ref), [`seekallvalues`](@ref).
 
 # Example
 ```julia
@@ -707,6 +851,140 @@ function seekflag(args :: AbstractVector{<:AbstractString}, flag :: AbstractStri
 end
 
 """
+    seekNvaluesof(parsedargs::ParsedArguments,flag::AbstractString,nseek::Integer)::Vector{FlagSearchResult}
+    seekNvaluesof(args::AbstractVector{<:AbstractString},flag::AbstractString,nseek::Int)::Vector{FlagSearchResult}
+
+If `flag` doesn't exist in `ARGS`, return an empty `Vector{FlagSearchResult}`.
+Otherwise, return a `Vector{FlagSearchResult}` with the requested flag plus
+a maximum of `nseek` values.
+They can be extracted and converted using [`getvalues`](@ref), or counted with
+[`countvalues`](@ref).
+
+Note that applying `getvalues` on the output of `seekNvaluesof(args,"-t",2)
+picks up both `a` and `b` whether the CLI arguments are `-t a b` or `-t a -f etc -t b`.
+
+This is a variant of [`seekvaluesof`](@ref). Use this if you want to curtail
+the amount of values that go with a flag.
+
+`seekNvalsof` is an alias of this function.
+
+See also [`seekflag`](@ref), [`seekallvalues`](@ref).
+
+# Example
+
+Suppose your program always takes one filename and has multiple optional flags,
+all of which take a fixed amount of arguments.
+
+In this example, all of these calls are valid, and `points1.dat` is always
+detected as the filename since all the argument-taking flags take a fixed
+amount of arguments:
+```
+julia script.jl points1.dat --temp 300
+julia script.jl --temp 300 points1.dat
+julia script.jl --niter 500 --temp 300 points1.dat
+julia script.jl --temp 300 points1.dat --niter 500
+```
+
+In that case, this snippet seeks the optional values, if any, and takes the sole
+unclaimed value at the end and assumes it's the filename.
+
+```julia
+claimedtokens = FlagSearchResult[]
+
+tempdata = FlagSearchResult[]
+append!(tempdata, seekNvaluesof(ARGS,"-t",1))
+append!(tempdata, seekNvaluesof(ARGS,"--temp",1))
+temp = getvalue(tempdata,Float64)
+
+append!(claimedtokens,tempdata) # For detecting unclaimed tokens
+
+niterdata = FlagSearchResult[]
+append!(niterdata, seekNvaluesof(ARGS,"-n",1))
+append!(niterdata, seekNvaluesof(ARGS,"--niter",1))
+niter = getvalue(niterdata,Int)
+
+append!(claimedtokens,niterdata) # For detecting unclaimed tokens
+
+# There should be exactly one unclaimed token containing the filename
+unclaimed = findunclaimedtokens(ARGS,claimedtokens)
+
+if countvalues(unclaimed) != 1
+    error("It's mandatory that you pass exactly one filename containing a data cloud!")
+elseif length(unclaimed) != 1
+    error("It's mandatory that you pass exactly one filename containing a data cloud! Or maybe, did you pass a typo flag?")
+else
+    filename = getvalue(unclaimed)
+    # Here you can check that the requested filename exists
+end
+
+# Save `temp`, `niter`, `filename` to a struct or Dict here
+```
+"""
+function seekNvaluesof(parsedargs :: ParsedArguments, flag :: AbstractString, nseek :: Integer)
+    return seekNvaluesof(parsedargs.args, flag, nseek)
+end
+
+function seekNvaluesof(args :: AbstractVector{<:AbstractString}, flag :: AbstractString, nseek :: Integer)
+    if nseek < 1
+        error("Pass a positive number to seekNvaluesof! You passed $nseek\nIf you want to test if a flag was passed, use seekflag")
+    end
+
+    # This function is only meant to be called for flags that take values
+    # Therefore, if the user passes a charflag, this block checks that this
+    #   charflag isn't in a cluster
+    if length(flag) == 2 && startswith(flag,'-')
+        if flag == "--"
+            error("Invalid flag passed: \"--\"")
+        end
+        for arg in args
+            # If an arg is a char-flag cluster, AND the flag we're looking
+            #   is in the cluster, error out. Acceptors are forbidden from being in char-flag clusters
+            if ischarflag(arg) && length(arg) > 2 && flag[2] in arg
+                error("The value-taking char-flag \"$flag\" is part of a cluster: \"$arg\" . Write it outside the cluster.")
+            end
+        end
+    end
+
+    # If we reach this point, then it's certain that the requested
+    #   value-taking charflag aren't written in clusters, while string-flags
+    #   are always written separately
+    nargs = length(args)
+    searchresults = FlagSearchResult[]
+    foundtheflag = false
+    for i in 1:nargs
+        # This is the only part that differs from seekvaluesof
+        # Stop the scan if we have reached the requested amount of values
+        if countvalues(searchresults) >= nseek
+            return searchresults
+        end
+
+        if args[i] == flag
+            foundtheflag = true
+            push!(searchresults, FlagSearchResult(i,1,flag))
+            continue
+        end
+
+        if foundtheflag
+            if isvalue(args[i])
+                push!(searchresults, FlagSearchResult(i,1,args[i]))
+            else
+                # If we reach the next flag, stop appending strings to searchresults
+                foundtheflag = false
+            end
+        end
+    end
+
+    return searchresults
+end
+
+"""
+    seekNvalsof(arguments...)
+
+Alias for [`seekNvaluesof`](@ref).
+"""
+seekNvalsof(arguments...) = seekNvaluesof(arguments...)
+
+"""
     seekvaluesof(parsedargs::ParsedArguments,flag::AbstractString)::Vector{FlagSearchResult}
     seekvaluesof(args::AbstractVector{<:AbstractString},flag::AbstractString)::Vector{FlagSearchResult}
 
@@ -716,7 +994,7 @@ values. They can be extracted and converted using [`getvalues`](@ref).
 
 `seekvalsof` is an alias of this function.
 
-See also [`seekflag`](@ref), [`seekallvalues`](@ref).
+See also [`seekflag`](@ref), [`seekNvaluesof`](@ref), [`seekallvalues`](@ref).
 
 # Example
 ```julia
@@ -753,8 +1031,9 @@ function seekvaluesof(args :: AbstractVector{<:AbstractString}, flag :: Abstract
         end
     end
 
-    # If we reach this point, then it's certain that charflags aren't written in clusters,
-    #   while string-flags are always written separately
+    # If we reach this point, then it's certain that the requested
+    #   value-taking charflag aren't written in clusters, while string-flags
+    #   are always written separately
     nargs = length(args)
     searchresults = FlagSearchResult[]
     foundtheflag = false
@@ -769,7 +1048,7 @@ function seekvaluesof(args :: AbstractVector{<:AbstractString}, flag :: Abstract
                 push!(searchresults, FlagSearchResult(i,1,args[i]))
             else
                 # If we reach the next flag, stop appending strings to searchresults
-                break
+                foundtheflag = false
             end
         end
     end
@@ -795,7 +1074,7 @@ values).
 
 `seekallvals` is an alias of this function.
 
-See also [`seekflag`](@ref), [`seekvaluesof`](@ref).
+See also [`seekflag`](@ref), [`seekNvaluesof`](@ref), [`seekvaluesof`](@ref).
 
 # Example
 ```

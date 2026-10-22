@@ -25,7 +25,7 @@ That's it. If you're familiar with the way `bash` manages flags you're also fami
 
 # Examples of features
 
-This section shows a few examples of the package's functions in action. In a real-world use-case, you'd include these snippets in an argument-parsing function. There are two example functions at the end of this page.
+This section shows a few examples of the package's functions in action. In a real-world use-case, you'd include these snippets in an argument-parsing function. There are some example functions at the end of this page.
 
 ## Checking for mutual exclusivity
 
@@ -79,13 +79,12 @@ Suppose you want a program that:
 * takes one bin count, indicated by either `-b` or `--nbins`. If this value isn't specified, the bin count takes the default value 50.
 * accepts other optional toggles like `-q` or `-v`
 
-Then you can use this to fetch the values from a call like this:
 Using `PlainCLIArgs.jl`, your program will be able to fetch values and toggles from command-line, regardless of their order. Here's some example calls:
 
 ```bash
 $:julia script.jl -q -f file1.txt file2.txt -b 100
 $:julia script.jl -b 100 -f file1.txt file2.txt
-$:julia script.jl -quiet --file file1.txt file2.txt --nbins 100
+$:julia script.jl --quiet --file file1.txt file2.txt --nbins 100
 ```
 
 Here's what the value-fetching code looks like:
@@ -103,7 +102,7 @@ append!(filenamesdata, seekvaluesof(ARGS,"--file"))
 
 Afterwards, you can use `countvalues(filenamesdata)` to count the amount of filenames passed and error out if the user passed none, or use `getvalues(filenamesdata)` to extract the actual filenames. More on these later.
 
-Also, `seekvalsof` is defined as an alias for `seekvaluesof`, in case you prefer that shorthand name.
+Also, `seekvalsof` is defined as an alias for `seekvaluesof`, in case you prefer shorthand.
 
 # Example function: parsing the arguments of a simple program
 
@@ -152,9 +151,9 @@ The function `parseargs` returns a `ParsedArguments` value. It has four fields; 
 
 Other `PlainCLIArgs.jl` features such as detecting stray flags or flag collision requires a bit more legwork (such as the type `FlagSearchResult`). The next example shows you how.
 
-# Example function: parsing the arguments of a complex program
+# Example function: parsing function that detects stray values
 
-For the final example we'll go over an argument-parsing function for a program that takes:
+For this example we'll go over an argument-parsing function for a program that takes:
 * A mandatory filename list, which can have any number of files.
 * A number of bins, although this is optional (the default value is 50).
 * A verbosity toggle; the program is quiet by default.
@@ -164,6 +163,8 @@ We'll also add a mutual-exclusivity check because of the verbosity toggle, and t
 For example, here are some valid ways to call the program:
 
 ```bash
+$:julia script.jl file1.txt
+$:julia script.jl file1.txt file2.txt
 $:julia script.jl --help
 $:julia script.jl -q -f file1.txt file2.txt -b 100
 $:julia script.jl --quiet -b 100 -f file1.txt file2.txt
@@ -199,6 +200,12 @@ function loadMyComplexProgramBehavior(args :: AbstractVector{<:AbstractString})
     nbins = 50
     modequiet = true
     modehelp  = false
+
+    # If the user passed no flags, all values are assumed to be filenames,
+    #   and this run skips the rest of the checks
+    if !any(startswith.(args,'-'))
+        return MyComplexProgramBehavior(args,nbins,modequiet,modehelp)
+    end
 
     # This helps us detect stray flags or typos
     claimedtokens = FlagSearchResult[]
@@ -280,3 +287,86 @@ The code we haven't seen yet is:
 * `getvalues` is like `getvalue`, but it takes any `Vector{FlagSearchResult}` and returns a vector (of `String`s if no type is provided, of the requested type otherwise). Suppose your program took a variable amount of temperature values. You can save them to a floatvec with: `temps = getvalues(tempdata,Float64)`
 * `countvalues` returns the amount of values passed for a flag. Use this to ensure that the user passed a valid number of arguments for a given flag.
 * `seekallvalues` extracts all values from `ARGS`. You can use this over `seekvaluesof` if your program doesn't need to distinguish between value types (suppose, they're all filenames or all temperatures) and you'd rather have its calls look like `$:julia script.jl file1.txt file2.txt --verbose` rather than `$:julia script.jl --file file1.txt file2.txt --verbose`.
+
+# Example function: handling negative values
+
+Flags always start with one or two dashes. What if your program ought to take ***gasp*** negative numbers?
+
+Well, that requires a few extra steps, but that's it. `PlainCLIArgs.jl`'s functions are composable and play nicely with other `julia` functions, so there's multiple ways to get around this. Here's what I consider to be the simplest way. Basically, we:
+1) decide a way to represent negative numbers without a dash, say, `min5` instead of `-5`, then
+2) pass a `Pair` with the replacement rules to the `getvalue` or `getvalues` calls. Or pass a vector if you want multiple rules.
+And we're done.
+
+Suppose your program scans a text file with points, some of which are outliers: for the dataset you're using, any value `< -5` or `> 5` is noise, though you want to tweak the bounds for other datasets.
+
+Your program's `struct` looks like this:
+```julia
+struct BehaviorParsenegativevalues
+    filename :: String
+    leftbound :: Float64
+    rightbound :: Float64
+end
+```
+(You can also use a `Dict` if you prefer)
+
+Also, you want to allow the prefixes "min" and "m" to stand-in for the minus sign. Note that you can easily change this later by modifying `replacerules` (or however you wish to call this).
+
+As for your argument-parsing function, it looks like this:
+```julia
+...
+# Set defaults
+leftbound = -Inf
+rightbound = Inf
+# Add more/edit the replacerules if you want
+# Note that the substrings on the left side are
+#   regex, and the "min" and "m" fragments are only
+#   replaced if they appear at the start of a word
+# Write them from longest to shortest:
+replacerules = [r"^min" => "-", r"^m" => "-"]
+
+# Scan the args for an input filename value
+# Don't pass replacerules here; we don't want, say,
+#   "mini-example.dat" to turn into "-i-example.dat"
+filenamedata = FlagSearchResult[]
+append!(filenamedata, seekNvaluesof(args,"-f",1))
+append!(filenamedata, seekNvaluesof(args,"--file",1))
+filename = getvalue(filenamedata)
+
+# Scan the args for an explicit range, overwrite the defaults if the
+#   values are found, or do nothing if the user left them blank
+rangedata = FlagSearchResult[]
+append!(rangedata, seekNvaluesof(args,"-r",2))
+append!(rangedata, seekNvaluesof(args,"--range",2))
+if countvalues(rangedata) == 2
+    rangevals = getvalues(rangedata,Float64,replacerules) # <- replacerules is passed here
+    leftbound = rangevals[1]
+    rightbound = rangevals[2]
+# Error out if the user passed only 1 value
+elseif countvalues(rangedata) == 1
+    error("You have to pass two values to a -r/--range flag! If you only want one bound, write \"minInf\" (no left bound) or \"Inf\" (no right bound)")
+end
+
+return BehaviorParsenegativevalues(filename,leftbound,rightbound)
+...
+```
+
+Note that we used `seekNvaluesof` rather than `seekvaluesof`. You can use this function if your flags have a fixed amount of arguments, and this would let you write the filename without a `-f` or `--file` flag, since a correct call would always have one unclaimed token, like this:
+```julia
+# The unclaimed vector was built stepwise by `append!`ing the `FlagSearchResult`
+#   vectors to it, like this:
+#   append!(unclaimed,rangedata)
+#   after every flag defined in your program. See the earlier function
+#   `loadMyComplexProgramBehavior` for a complete example
+#
+# There should be exactly one unclaimed token containing the filename           
+unclaimed = findunclaimedtokens(ARGS,claimedtokens)                             
+                                                                                
+if countvalues(unclaimed) != 1                                                  
+    error("It's mandatory that you pass exactly one filename containing a data cloud!")
+elseif length(unclaimed) != 1                                                   
+    error("It's mandatory that you pass exactly one filename containing a data cloud! Or maybe, did you pass a typo flag?")
+else                                                                            
+    filename = getvalue(unclaimed)                                              
+    # Here you can check that the requested filename exists                     
+end
+```

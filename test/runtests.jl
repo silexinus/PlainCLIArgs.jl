@@ -55,10 +55,10 @@ end
 end
 
 @testset "seekallvalues - basic extraction" begin
-    args = ["-f", "file1.txt", "-q", "file2.txt"]
+    args = ["-f", "file1.txt", "-q", "file2.txt", "-t", "80", "100"]
     result = PlainCLIArgs.seekallvalues(args)
-    @test length(result) == 2
-    @test PlainCLIArgs.getvalues(result) == ["file1.txt", "file2.txt"]
+    @test length(result) == 4
+    @test PlainCLIArgs.getvalues(result) == ["file1.txt", "file2.txt", "80", "100"]
 end
 
 @testset "seekallvalues - no values present" begin
@@ -84,3 +84,16 @@ end
     args = ["-f", "file1.txt", "-q", "file2.txt"]
     @test PlainCLIArgs.seekallvals(args) == PlainCLIArgs.seekallvalues(args)
 end
+
+@testset "test the replace substring machinery" begin
+    include("test-parsenegativenums.jl")
+end
+
+@testset "test seekNvaluesof" begin
+    include("test-seekNvalues.jl")
+end
+
+@testset "test dispatch of functions that can take a replacerules argument" begin
+    include("test-replacerulesdispatch.jl")
+end
+

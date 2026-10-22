@@ -1,13 +1,13 @@
 module PlainCLIArgs
 
 export ParsedArguments, FlagSearchResult,
-       parseargs, seekflag, seekvaluesof, seekallvalues,
+       parseargs, seekflag, seekNvaluesof, seekvaluesof, seekallvalues,
        checkmutualexclusivity, checkgroupexclusivity,
        findunclaimedtokens, writetokens,
        isvalue, getvalue, getvalues,
        countvalues,
        # Now the aliases
-       seekvalsof, seekallvals,
+       seekvalsof, seekNvalsof, seekallvals,
        isval, getval, getvals,
        countvals
 
