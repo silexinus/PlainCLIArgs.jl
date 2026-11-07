@@ -23,6 +23,17 @@
 
 That's it. If you're familiar with the way `bash` manages flags you're also familiar with axioms 1–3; the only surprise is point 4.
 
+## Table of contents
+
+- [Examples of features](#examples-of-features)
+  - [Checking for mutual exclusivity](#checking-for-mutual-exclusivity)
+  - [Checking for group exclusivity](#checking-for-group-exclusivity)
+  - [Fetching toggles from `ARGS`](#fetching-toggles-from-args)
+  - [Fetching values from `ARGS`](#fetching-values-from-args)
+- [Example function: parsing the arguments of a simple program](#example-function-parsing-the-arguments-of-a-simple-program)
+- [Example function: parsing function that detects stray values](#example-function-parsing-function-that-detects-stray-values)
+- [Example function: handling negative values](#example-function-handling-negative-values)
+
 # Examples of features
 
 This section shows a few examples of the package's functions in action. In a real-world use-case, you'd include these snippets in an argument-parsing function. There are some example functions at the end of this page.
@@ -278,7 +289,7 @@ function loadMyComplexProgramBehavior(args :: AbstractVector{<:AbstractString})
     end
 
     return MyComplexProgramBehavior(filenames,nbins,modequiet,modehelp)
-end 
+end
 ```
 
 The code we haven't seen yet is:
@@ -286,7 +297,7 @@ The code we haven't seen yet is:
 * `getvalue` extracts the value from a `FlagSearchResult` or 1-element `Vector{FlagSearchResult}`. In the example above we want an integer value, hence we pass `Int` as the second argument of `getvalue`. If you run `getvalue(binsdata)`, you'll get the value as a `String`.
 * `getvalues` is like `getvalue`, but it takes any `Vector{FlagSearchResult}` and returns a vector (of `String`s if no type is provided, of the requested type otherwise). Suppose your program took a variable amount of temperature values. You can save them to a floatvec with: `temps = getvalues(tempdata,Float64)`
 * `countvalues` returns the amount of values passed for a flag. Use this to ensure that the user passed a valid number of arguments for a given flag.
-* `seekallvalues` extracts all values from `ARGS`. You can use this over `seekvaluesof` if your program doesn't need to distinguish between value types (suppose, they're all filenames or all temperatures) and you'd rather have its calls look like `$:julia script.jl file1.txt file2.txt --verbose` rather than `$:julia script.jl --file file1.txt file2.txt --verbose`.
+* `seekallvalues` extracts all values from `ARGS`. You can use this instead of `seekvaluesof` if your program doesn't need flags to distinguish between value types (suppose, they're all filenames and/or temperatures) and you'd rather have its calls look like `$:julia script.jl file1.txt file2.txt --verbose` rather than `$:julia script.jl --file file1.txt file2.txt --verbose`.
 
 # Example function: handling negative values
 
@@ -358,15 +369,15 @@ Note that we used `seekNvaluesof` rather than `seekvaluesof`. You can use this f
 #   after every flag defined in your program. See the earlier function
 #   `loadMyComplexProgramBehavior` for a complete example
 #
-# There should be exactly one unclaimed token containing the filename           
-unclaimed = findunclaimedtokens(ARGS,claimedtokens)                             
-                                                                                
-if countvalues(unclaimed) != 1                                                  
+# There should be exactly one unclaimed token containing the filename
+unclaimed = findunclaimedtokens(ARGS,claimedtokens)
+
+if countvalues(unclaimed) != 1
     error("It's mandatory that you pass exactly one filename containing a data cloud!")
-elseif length(unclaimed) != 1                                                   
+elseif length(unclaimed) != 1
     error("It's mandatory that you pass exactly one filename containing a data cloud! Or maybe, did you pass a typo flag?")
-else                                                                            
-    filename = getvalue(unclaimed)                                              
-    # Here you can check that the requested filename exists                     
+else
+    filename = getvalue(unclaimed)
+    # Here you can check that the requested filename exists
 end
 ```
